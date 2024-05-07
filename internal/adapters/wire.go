@@ -8,8 +8,7 @@ import (
 
 // AdaptersSet contains "adapters" to 3th party systems
 var AdaptersSet = wire.NewSet(
-	publisher.NewPublisher,
-	// wire.Bind(new(publisher.IEventPublisher), new(*publisher.RabbitPublisher)),
 	listener.NewListener,
 	wire.Bind(new(listener.IListener), new(*listener.Listener)),
+	publisher.NewEventPublisherAdapter,
 )

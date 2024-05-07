@@ -12,14 +12,14 @@ var _ publisher.IPublisherConfigFactory = (*PublisherConfig)(nil)
 type PublisherConfig struct {
 	Topic       string                  `mapstructure:"topic"`
 	TopicPrefix string                  `mapstructure:"topicPrefix"`
-	Addr        string                  `mapstructure:"addr"`
+	Addr        string                  `mapstructure:"uri"`
 	Type        publisher.PublisherType `mapstructure:"type"`
 }
 
 func NewPublisherConfig(c *Configurator) *PublisherConfig {
 	cfg := PublisherConfig{}
 
-	if err := viper.Unmarshal(&cfg); err != nil {
+	if err := viper.UnmarshalKey("publisher", &cfg); err != nil {
 		slog.Error("app publisher parse error")
 	}
 
@@ -28,6 +28,7 @@ func NewPublisherConfig(c *Configurator) *PublisherConfig {
 
 func (p *PublisherConfig) Config() publisher.PublisherConfig {
 	return publisher.PublisherConfig{
+		Type:  p.Type,
 		Topic: p.Topic,
 		Addr:  p.Addr,
 	}

@@ -30,12 +30,12 @@ func NewServer() (*Server, error) {
 	publicRouter := routers.NewPublicRouter(healthCheckHandler, readyCheckHandler)
 	swaggerRouter := routers.NewSwaggerRouter()
 	publisherConfig := configs.NewPublisherConfig(configurator)
-	iEventPublisher := publisher.NewPublisher(publisherConfig)
+	eventPublisherAdapter := publisher.NewEventPublisherAdapter(publisherConfig)
 	mongoConfig := configs.NewMongoConfig(configurator)
 	mongoConnection := mongodb.NewMongoConnection(mongoConfig)
 	cdcRepository := repositories.NewCDCRepository(mongoConnection)
 	listenerConfig := configs.NewListenerConfig(configurator)
-	listenerListener := listener.NewListener(iEventPublisher, cdcRepository, listenerConfig)
+	listenerListener := listener.NewListener(eventPublisherAdapter, cdcRepository, listenerConfig)
 	server := NewApp(appConfig, errorsHandler, publicRouter, swaggerRouter, listenerListener)
 	return server, nil
 }

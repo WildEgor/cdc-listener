@@ -21,11 +21,11 @@ import (
 )
 
 var AppSet = wire.NewSet(
-	NewApp,
 	configs.ConfigsSet,
 	routers.RouterSet,
 	adapters.AdaptersSet,
 	repositories.RepositoriesSet,
+	NewApp,
 )
 
 // Server represents the main server configuration.

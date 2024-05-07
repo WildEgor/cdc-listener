@@ -28,13 +28,12 @@ type ChangedData struct {
 // CDCStore collects changes
 type CDCStore struct {
 	eventsPool *sync.Pool
-	Actions    []ChangedData
+	data       *ChangedData
 }
 
 func NewCDCStore(pool *sync.Pool) *CDCStore {
 	return &CDCStore{
 		eventsPool: pool,
-		Actions:    make([]ChangedData, 0),
 	}
 }
 
@@ -51,47 +50,45 @@ func (s *CDCStore) AssertData(_id string, subj string, kind OperationType, oldDo
 		NewDocument: newDocument,
 	}
 
-	s.Actions = append(s.Actions, ad)
+	s.data = &ad
 
-	return &ad, nil
+	return s.data, nil
 }
 
 // CreateEventsWithFilter filter db events
-func (s *CDCStore) CreateEventsWithFilter(ctx context.Context, tableMap map[string][]string) <-chan *publisher.Event {
-	output := make(chan *publisher.Event)
+func (s *CDCStore) CreateEventsWithFilter(ctx context.Context, tableMap map[string][]string) *publisher.Event {
+	if s.data == nil {
+		return nil
+	}
 
-	go func(ctx context.Context) {
-		for _, item := range s.Actions {
-			if err := ctx.Err(); err != nil {
-				slog.Debug("create events with filter: context canceled")
-				break
-			}
+	if err := ctx.Err(); err != nil {
+		slog.Debug("create events with filter: context canceled")
+		return nil
+	}
 
-			event := s.eventsPool.Get().(*publisher.Event)
-			event.ID = item.ID
-			event.Collection = item.Coll
-			event.Data = item.NewDocument
-			event.Action = item.Kind.string()
+	event := s.eventsPool.Get().(*publisher.Event)
+	event.ID = s.data.ID
+	event.Collection = s.data.Coll
+	event.Data = s.data.NewDocument
+	event.Action = s.data.Kind.string()
 
-			actions, validTable := tableMap[fmt.Sprintf("%s.%s", item.Db, item.Coll)]
-			validAction := inArray(actions, item.Kind.string())
-			if validTable && validAction {
-				output <- event
-				continue
-			}
+	s.eventsPool.Put(event)
 
-			// TODO: add prom metric counter
+	actions, validTable := tableMap[fmt.Sprintf("%s.%s", s.data.Db, s.data.Coll)]
+	validAction := inArray(actions, s.data.Kind.string())
+	if validTable && validAction {
+		return event
+	}
 
-			slog.Debug(
-				"cdc-message was skipped by filter",
-				slog.String("collection", item.Coll),
-				slog.String("action", string(item.Kind)),
-			)
-		}
-		close(output)
-	}(ctx)
+	// TODO: add prom metric counter
 
-	return output
+	slog.Debug(
+		"cdc-message was skipped by filter",
+		slog.String("collection", s.data.Coll),
+		slog.String("action", string(s.data.Kind)),
+	)
+
+	return nil
 }
 
 // inArray checks whether the value is in an array.

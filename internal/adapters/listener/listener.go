@@ -17,14 +17,14 @@ var _ IListener = (*Listener)(nil)
 
 // Listener wrapper for collections listen logic
 type Listener struct {
-	publisher publisher.IEventPublisher
-	repo      ICDCRepository
-	store     *CDCStore
-	cfg       *configs.ListenerConfig
+	eventPubAdapter *publisher.EventPublisherAdapter
+	repo            ICDCRepository
+	store           *CDCStore
+	cfg             *configs.ListenerConfig
 }
 
 // NewListener create new listener
-func NewListener(pub publisher.IEventPublisher, repo ICDCRepository, cfg *configs.ListenerConfig) *Listener {
+func NewListener(pub *publisher.EventPublisherAdapter, repo ICDCRepository, cfg *configs.ListenerConfig) *Listener {
 	pool := &sync.Pool{
 		New: func() any {
 			return &publisher.Event{}
@@ -32,10 +32,10 @@ func NewListener(pub publisher.IEventPublisher, repo ICDCRepository, cfg *config
 	}
 
 	return &Listener{
-		publisher: pub,
-		repo:      repo,
-		store:     NewCDCStore(pool),
-		cfg:       cfg,
+		eventPubAdapter: pub,
+		repo:            repo,
+		store:           NewCDCStore(pool),
+		cfg:             cfg,
 	}
 }
 
@@ -54,10 +54,15 @@ func (l *Listener) WatchCollection(ctx context.Context, opts *WatchCollectionOpt
 			SetFullDocument(options.UpdateLookup).
 			SetFullDocumentBeforeChange(options.WhenAvailable)
 
-		if token != "" {
-			changeStreamOpts.SetResumeAfter(bson.D{
-				{Key: "_data", Value: token},
-			})
+		if len(token) != 0 {
+			m := bson.M{"_data": token}
+			data, err := bson.Marshal(m)
+			if err != nil {
+				slog.Error("failed to marshal bson resume token: ", err.Error())
+				return errors.ErrFailMarshalResumeToken
+			}
+
+			changeStreamOpts.SetResumeAfter(data)
 		}
 
 		cs, err := l.repo.GetWatchStream(changeStreamOpts)
@@ -88,10 +93,11 @@ func (l *Listener) WatchCollection(ctx context.Context, opts *WatchCollectionOpt
 				break
 			}
 
-			if err = l.repo.SaveResumeToken(currentResumeToken); err != nil {
-				slog.Error("could not insert resume token", "err", err)
-				break
-			}
+			// FIXME
+			//if err = l.repo.SaveResumeToken(currentResumeToken); err != nil {
+			//	slog.Error("could not insert resume token", "err", err)
+			//	break
+			//}
 		}
 
 		slog.Info("stopped watching mongodb collection")
@@ -112,7 +118,7 @@ func (l *Listener) Run(ctx context.Context) error {
 		group.Go(func() error {
 			watchCollOpts := &WatchCollectionOptions{
 				WatchedSubj:            subj,
-				ResumeTokensCollCapped: true,
+				ResumeTokensCollCapped: false,
 				StreamName:             "", // TODO: use as topic prefix
 				ChangeEventHandler: func(ctx context.Context, subj, msgId string, operationType OperationType, data []byte) error {
 					_, err := l.store.AssertData(msgId, subj, operationType, []byte{}, data)
@@ -120,24 +126,23 @@ func (l *Listener) Run(ctx context.Context) error {
 						return err
 					}
 
-					return err
+					event := l.store.CreateEventsWithFilter(groupCtx, l.cfg.MappedFilter)
+					if event == nil {
+						return nil
+					}
+					slog.Debug("publish")
+
+					if err := l.eventPubAdapter.Publisher.Publish(groupCtx, "notifier", event); err != nil {
+						return err
+					}
+
+					return nil
 				},
 			}
 
 			return l.WatchCollection(groupCtx, watchCollOpts)
 		})
 	}
-
-	group.Go(func() error {
-		for event := range l.store.CreateEventsWithFilter(groupCtx, l.cfg.MappedFilter) {
-			// TODO: make topic logic here
-			if err := l.publisher.Publish(groupCtx, "notifier", event); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
 
 	return group.Wait()
 }
