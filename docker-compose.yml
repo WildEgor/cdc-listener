@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+# Development container.
+# Runs in debug mode and live-reloading on every source file update.
+  app-dev:
+    hostname: app-dev
+    restart: unless-stopped
+    build:
+# if use private libs uncomment this
+#      args:
+#        - GITHUB_TOKEN=${GITHUB_TOKEN}
+      context: ./
+      dockerfile: Dockerfile
+      target: dev
+    env_file:
+      - .env
+    volumes:
+      - ./:/app
+    ports:
+      - 8888:${APP_PORT}

@@ -1,0 +1,85 @@
+{
+    "schemes": [
+        "http"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "App",
+        "title": "Swagger Doc",
+        "termsOfService": "/",
+        "contact": {
+            "name": "mail",
+            "url": "/",
+            "email": "kartashov_egor96@mail.ru"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "http://www.apache.org/licenses/MIT.html"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8888",
+    "basePath": "/",
+    "paths": {
+        "/api/v1/livez": {
+            "get": {
+                "description": "Health check service",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health Controller"
+                ],
+                "summary": "Health check service",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/v1/ping": {
+            "get": {
+                "description": "Just random return 200 OK or error",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Test Controller"
+                ],
+                "summary": "Dummy ping",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/v1/readyz": {
+            "get": {
+                "description": "Ready check service",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health Controller"
+                ],
+                "summary": "Ready check service",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        }
+    }
+}
