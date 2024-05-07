@@ -1,7 +1,7 @@
 package routers
 
 import (
-	"github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/handlers"
+	"github.com/WildEgor/cdc-listener/internal/handlers"
 	"github.com/google/wire"
 )
 
@@ -9,6 +9,5 @@ import (
 var RouterSet = wire.NewSet(
 	handlers.HandlersSet,
 	NewPublicRouter,
-	NewPrivateRouter,
 	NewSwaggerRouter,
 )

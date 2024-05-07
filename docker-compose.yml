@@ -1,21 +1,118 @@
 version: "3.8"
 
+networks:
+  listener-net:
+    driver: bridge
+
+volumes:
+  mongo_replica_1_data:
+  mongo_replica_2_data:
+  mongo_replica_3_data:
+  mongo_replica_1_config:
+  mongo_replica_2_config:
+  mongo_replica_3_config:
+
 services:
-# Development container.
-# Runs in debug mode and live-reloading on every source file update.
-  app-dev:
-    hostname: app-dev
+  mongo1:
+    image: mongo:7.0
+    command: [ "--replSet", "rs0", "--bind_ip_all", "--port", "27017" ]
+    ports:
+      - 27017:27017
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - mongo2
+      - mongo3
+    healthcheck:
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'host.docker.internal:27017',priority:1},{_id:1,host:'host.docker.internal:27018',priority:0.5},{_id:2,host:'host.docker.internal:27019',priority:0.5}]}) }" | mongosh --port 27017 --quiet
+      interval: 5s
+      timeout: 30s
+      start_period: 0s
+      retries: 30
+    volumes:
+      - "mongo_replica_1_data:/data/db"
+      - "mongo_replica_1_data:/data/configdb"
+
+  mongo2:
+    image: mongo:7.0
+    command: [ "--replSet", "rs0", "--bind_ip_all", "--port", "27018" ]
+    ports:
+      - 27018:27018
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - "mongo_replica_2_data:/data/db"
+      - "mongo_replica_2_data:/data/configdb"
+
+  mongo3:
+    image: mongo:7.0
+    command: [ "--replSet", "rs0", "--bind_ip_all", "--port", "27019" ]
+    ports:
+      - 27019:27019
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - "mongo_replica_3_data:/data/db"
+      - "mongo_replica_3_data:/data/configdb"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "guest"
+      RABBITMQ_DEFAULT_VHOST: "/"
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    networks:
+      - listener-net
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  prometheus:
+    image: prom/prometheus:v2.51.1
+    container_name: prometheus
+    networks:
+      - listener-net
+    ports:
+      - "9090:9090"
+    volumes:
+      - "./configs/prometheus.yml:/etc/prometheus/prometheus.yml"
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  grafana:
+    image: grafana/grafana:10.2.6
+    container_name: grafana
+    networks:
+      - listener-net
+    ports:
+      - "3000:3000"
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  listener:
+    hostname: listener
     restart: unless-stopped
+    networks:
+      - listener-net
     build:
-# if use private libs uncomment this
-#      args:
-#        - GITHUB_TOKEN=${GITHUB_TOKEN}
+      # if use private libs uncomment this
+      #      args:
+      #        - GITHUB_TOKEN=${GITHUB_TOKEN}
       context: ./
       dockerfile: Dockerfile
       target: dev
-    env_file:
-      - .env
+#    env_file:
+#      - .env
     volumes:
       - ./:/app
     ports:
-      - 8888:${APP_PORT}
+      - 8888:8888
+    depends_on:
+      - mongo1
+      - rabbitmq

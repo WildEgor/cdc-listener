@@ -1,9 +1,8 @@
 package routers
 
 import (
-	health_check_handler "github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/handlers/health_check"
-	ping_handler "github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/handlers/ping"
-	ready_check_handler "github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/handlers/ready_check"
+	health_check_handler "github.com/WildEgor/cdc-listener/internal/handlers/health_check"
+	ready_check_handler "github.com/WildEgor/cdc-listener/internal/handlers/ready_check"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/healthcheck"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
@@ -13,18 +12,15 @@ import (
 type PublicRouter struct {
 	hch *health_check_handler.HealthCheckHandler
 	rch *ready_check_handler.ReadyCheckHandler
-	ph  *ping_handler.PingCheckHandler
 }
 
 func NewPublicRouter(
 	hch *health_check_handler.HealthCheckHandler,
 	rch *ready_check_handler.ReadyCheckHandler,
-	ph *ping_handler.PingCheckHandler,
 ) *PublicRouter {
 	return &PublicRouter{
 		hch,
 		rch,
-		ph,
 	}
 }
 
@@ -34,9 +30,6 @@ func (r *PublicRouter) Setup(app *fiber.App) {
 		SkipSuccessfulRequests: true,
 	}))
 	v1 := api.Group("/v1")
-
-	// TODO: use for testing only (remove it)
-	v1.Get("/ping", r.ph.Handle)
 
 	v1.Get("/livez", healthcheck.NewHealthChecker(healthcheck.Config{
 		Probe: func(ctx fiber.Ctx) bool {

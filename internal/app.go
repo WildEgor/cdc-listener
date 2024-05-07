@@ -3,10 +3,13 @@ package pkg
 import (
 	"context"
 	"fmt"
-	"github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/configs"
-	eh "github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/handlers/errors"
-	nfm "github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/middlewares/not_found"
-	"github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/routers"
+	"github.com/WildEgor/cdc-listener/internal/adapters"
+	"github.com/WildEgor/cdc-listener/internal/adapters/listener"
+	"github.com/WildEgor/cdc-listener/internal/configs"
+	eh "github.com/WildEgor/cdc-listener/internal/handlers/errors"
+	nfm "github.com/WildEgor/cdc-listener/internal/middlewares/not_found"
+	"github.com/WildEgor/cdc-listener/internal/repositories"
+	"github.com/WildEgor/cdc-listener/internal/routers"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/recover"
@@ -21,16 +24,25 @@ var AppSet = wire.NewSet(
 	NewApp,
 	configs.ConfigsSet,
 	routers.RouterSet,
+	adapters.AdaptersSet,
+	repositories.RepositoriesSet,
 )
 
 // Server represents the main server configuration.
 type Server struct {
 	App       *fiber.App
 	AppConfig *configs.AppConfig
+	Listener  listener.IListener
 }
 
 func (srv *Server) Run(ctx context.Context) {
 	slog.Info("server is listening")
+
+	err := srv.Listener.Run(ctx)
+	if err != nil {
+		slog.Error("unable to start listener")
+		return
+	}
 
 	if err := srv.App.Listen(fmt.Sprintf(":%s", srv.AppConfig.Port), fiber.ListenConfig{
 		DisableStartupMessage: false,
@@ -40,11 +52,16 @@ func (srv *Server) Run(ctx context.Context) {
 		},
 	}); err != nil {
 		slog.Error("unable to start server")
+		return
 	}
 }
 
 func (srv *Server) Shutdown(ctx context.Context) {
 	slog.Info("shutdown service")
+
+	if err := srv.Listener.Stop(); err != nil {
+		slog.Error("unable to shutdown listener")
+	}
 
 	if err := srv.App.Shutdown(); err != nil {
 		slog.Error("unable to shutdown server")
@@ -54,9 +71,9 @@ func (srv *Server) Shutdown(ctx context.Context) {
 func NewApp(
 	ac *configs.AppConfig,
 	eh *eh.ErrorsHandler,
-	prr *routers.PrivateRouter,
 	pbr *routers.PublicRouter,
 	sr *routers.SwaggerRouter,
+	l listener.IListener,
 ) *Server {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -84,7 +101,6 @@ func NewApp(
 	}))
 	app.Use(recover.New())
 
-	prr.Setup(app)
 	pbr.Setup(app)
 	sr.Setup(app)
 
@@ -93,6 +109,7 @@ func NewApp(
 
 	return &Server{
 		App:       app,
+		Listener:  l,
 		AppConfig: ac,
 	}
 }
