@@ -1,9 +1,16 @@
 package configs
 
-import "github.com/google/wire"
+import (
+	"github.com/WildEgor/cdc-listener/internal/adapters/publisher"
+	"github.com/google/wire"
+)
 
 // ConfigsSet contains project configs
 var ConfigsSet = wire.NewSet(
-	NewAppConfig,
 	NewConfigurator,
+	NewAppConfig,
+	NewMongoConfig,
+	NewListenerConfig,
+	NewPublisherConfig,
+	wire.Bind(new(publisher.IPublisherConfigFactory), new(*PublisherConfig)),
 )

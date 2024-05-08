@@ -7,12 +7,15 @@
 package pkg
 
 import (
-	"github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/configs"
-	"github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/handlers/errors"
-	"github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/handlers/health_check"
-	"github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/handlers/ping"
-	"github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/handlers/ready_check"
-	"github.com/WildEgor/e-shop-fiber-microservice-boilerplate/internal/routers"
+	"github.com/WildEgor/cdc-listener/internal/adapters/listener"
+	"github.com/WildEgor/cdc-listener/internal/adapters/publisher"
+	"github.com/WildEgor/cdc-listener/internal/configs"
+	"github.com/WildEgor/cdc-listener/internal/db/mongodb"
+	"github.com/WildEgor/cdc-listener/internal/handlers/errors"
+	"github.com/WildEgor/cdc-listener/internal/handlers/health_check"
+	"github.com/WildEgor/cdc-listener/internal/handlers/ready_check"
+	"github.com/WildEgor/cdc-listener/internal/repositories"
+	"github.com/WildEgor/cdc-listener/internal/routers"
 	"github.com/google/wire"
 )
 
@@ -22,13 +25,18 @@ func NewServer() (*Server, error) {
 	configurator := configs.NewConfigurator()
 	appConfig := configs.NewAppConfig(configurator)
 	errorsHandler := error_handler.NewErrorsHandler()
-	privateRouter := routers.NewPrivateRouter()
 	healthCheckHandler := health_check_handler.NewHealthCheckHandler()
 	readyCheckHandler := ready_check_handler.NewReadyCheckHandler()
-	pingCheckHandler := ping_handler.NewPingHandler()
-	publicRouter := routers.NewPublicRouter(healthCheckHandler, readyCheckHandler, pingCheckHandler)
+	publicRouter := routers.NewPublicRouter(healthCheckHandler, readyCheckHandler)
 	swaggerRouter := routers.NewSwaggerRouter()
-	server := NewApp(appConfig, errorsHandler, privateRouter, publicRouter, swaggerRouter)
+	publisherConfig := configs.NewPublisherConfig(configurator)
+	eventPublisherAdapter := publisher.NewEventPublisherAdapter(publisherConfig)
+	mongoConfig := configs.NewMongoConfig(configurator)
+	mongoConnection := mongodb.NewMongoConnection(mongoConfig)
+	cdcRepository := repositories.NewCDCRepository(mongoConnection)
+	listenerConfig := configs.NewListenerConfig(configurator)
+	listenerListener := listener.NewListener(eventPublisherAdapter, cdcRepository, listenerConfig)
+	server := NewApp(appConfig, errorsHandler, publicRouter, swaggerRouter, listenerListener)
 	return server, nil
 }
 

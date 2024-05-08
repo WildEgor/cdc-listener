@@ -3,5 +3,4 @@ vendor
 docker-compose.yml
 .air.toml
 .air-unix.toml
-.env
-.env.example
+config.yml

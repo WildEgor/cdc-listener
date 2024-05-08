@@ -1,0 +1,5 @@
+scrape_configs:
+  - job_name: 'mongodb-cdc-listener'
+    scrape_interval: 1s
+    static_configs:
+      - targets: ['listener:8888']

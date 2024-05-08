@@ -1,7 +1,7 @@
 package configs
 
 import (
-	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 	"log/slog"
 )
 
@@ -15,10 +15,13 @@ func NewConfigurator() *Configurator {
 	return c
 }
 
-// load Load env data from files (default: .env, .env.local)
+// load Load env data from files config
 func (c *Configurator) load() {
-	err := godotenv.Load(".env", ".env.local")
-	if err != nil {
-		slog.Error("error loading envs file")
+	viper.AddConfigPath(".")
+	viper.SetConfigName("config")
+	viper.SetConfigType("yml")
+	if err := viper.ReadInConfig(); err != nil {
+		slog.Error("error loading config file")
+		return
 	}
 }
