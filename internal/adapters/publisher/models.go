@@ -25,8 +25,8 @@ type Event struct {
 	ID         string    `json:"id"`
 	Collection string    `json:"collection"`
 	Action     string    `json:"action"`
-	Data       []byte    `json:"data"`
-	DataOld    []byte    `json:"data_old"`
+	Data       any       `json:"data"`
+	DataOld    any       `json:"data_old"`
 	EventTime  time.Time `json:"event_time"`
 }
 

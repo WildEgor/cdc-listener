@@ -2,14 +2,10 @@ package listener
 
 import (
 	"context"
-	"github.com/WildEgor/cdc-listener/internal/adapters/publisher"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-type eventPublisher interface {
-	Publish(context.Context, string, *publisher.Event) error
-}
 
 type OperationType string
 
@@ -32,7 +28,7 @@ func (k OperationType) string() string {
 	return string(k)
 }
 
-type ChangeEventHandler func(ctx context.Context, subj, msgId string, opType OperationType, data []byte) error
+type ChangeEventHandler func(ctx context.Context, subj, msgId string, opType OperationType, data bson.M) error
 
 type WatchCollectionOptions struct {
 	WatchedSubj            string

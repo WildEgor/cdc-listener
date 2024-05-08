@@ -4,15 +4,18 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	"log/slog"
+	"strings"
 )
+
+type FilterConfig struct {
+	Db          string              `mapstructure:"db"`
+	Collections map[string][]string `mapstructure:"collections"`
+}
 
 // ListenerConfig holds the main app configurations
 type ListenerConfig struct {
-	Filter []struct {
-		Name        string              `mapstruct:"db"`
-		Collections map[string][]string `mapstruct:"collections"`
-	} `mapstruct:"filter"`
-
+	Filter       []FilterConfig    `mapstructure:"filter"`
+	TopicsMap    map[string]string `mapstructure:"topicsMap"`
 	MappedFilter map[string][]string
 }
 
@@ -27,7 +30,7 @@ func NewListenerConfig(c *Configurator) *ListenerConfig {
 
 	for _, s := range cfg.Filter {
 		for coll, ops := range s.Collections {
-			cfg.MappedFilter[cfg.GetSubject(s.Name, coll)] = ops
+			cfg.MappedFilter[cfg.GetSubject(s.Db, coll)] = ops
 		}
 	}
 
@@ -36,4 +39,16 @@ func NewListenerConfig(c *Configurator) *ListenerConfig {
 
 func (c *ListenerConfig) GetSubject(db, coll string) string {
 	return fmt.Sprintf("%s.%s", db, coll)
+}
+
+func (c *ListenerConfig) GetTopic(subj string) string {
+	parsed := strings.Split(subj, ".")
+	result := strings.Join(parsed, "-")
+
+	topic, ok := c.TopicsMap[result]
+	if !ok {
+		return ""
+	}
+
+	return topic
 }

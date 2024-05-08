@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/WildEgor/cdc-listener/internal/adapters/publisher"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 )
 
 // ChangedData is kind of CDC message data.
@@ -20,9 +23,9 @@ type ChangedData struct {
 	// Kind operation type
 	Kind OperationType
 	// TODO: need somehow get it
-	OldDocument []byte
+	OldDocument bson.M
 	// NewDocument updated data
-	NewDocument []byte
+	NewDocument bson.M
 }
 
 // CDCStore collects changes
@@ -38,16 +41,38 @@ func NewCDCStore(pool *sync.Pool) *CDCStore {
 }
 
 // AssertData add changes to store
-func (s *CDCStore) AssertData(_id string, subj string, kind OperationType, oldDocument []byte, newDocument []byte) (a *ChangedData, err error) {
+func (s *CDCStore) AssertData(_id string, subj string, kind OperationType, oldDocument bson.M, newDocument bson.M) (a *ChangedData, err error) {
 	subjects := strings.Split(subj, ".")
 
+	convertedItem := make(map[string]interface{})
+	for key, val := range newDocument {
+		switch v := val.(type) {
+		case primitive.ObjectID:
+			convertedItem[key] = v.Hex()
+		case bson.M:
+			subMap := make(map[string]interface{})
+			for subKey, subVal := range v {
+				subMap[subKey] = subVal
+			}
+			convertedItem[key] = subMap
+		case bson.A:
+			subArray := make([]interface{}, len(v))
+			for i, subVal := range v {
+				subArray[i] = subVal
+			}
+			convertedItem[key] = subArray
+		default:
+			convertedItem[key] = v
+		}
+	}
+
 	ad := ChangedData{
-		ID:          _id,
+		ID:          convertedItem["_id"].(string),
 		Db:          subjects[0],
 		Coll:        subjects[1],
 		Kind:        kind,
-		OldDocument: []byte{},
-		NewDocument: newDocument,
+		OldDocument: map[string]interface{}{},
+		NewDocument: convertedItem,
 	}
 
 	s.data = &ad
@@ -71,6 +96,7 @@ func (s *CDCStore) CreateEventsWithFilter(ctx context.Context, tableMap map[stri
 	event.Collection = s.data.Coll
 	event.Data = s.data.NewDocument
 	event.Action = s.data.Kind.string()
+	event.EventTime = time.Now()
 
 	s.eventsPool.Put(event)
 

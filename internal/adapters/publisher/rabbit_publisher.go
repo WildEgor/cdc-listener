@@ -45,7 +45,7 @@ func NewRabbitPublisher(cfg IPublisherConfigFactory) (*RabbitPublisher, error) {
 
 // Publish send events, implements eventPublisher.
 func (p *RabbitPublisher) Publish(ctx context.Context, topic string, event *Event) error {
-	body, err := json.Marshal(event.Data)
+	body, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func (p *RabbitPublisher) Publish(ctx context.Context, topic string, event *Even
 		ctx,
 		body,
 		[]string{""},
-		rabbitmq.WithPublishOptionsContentEncoding("utf-8"),
+		//rabbitmq.WithPublishOptionsContentEncoding("utf-8"),
 		rabbitmq.WithPublishOptionsExchange(topic),
 		rabbitmq.WithPublishOptionsContentType("application/json"),
 		rabbitmq.WithPublishOptionsExchange(p.pt),

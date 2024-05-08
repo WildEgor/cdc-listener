@@ -74,10 +74,12 @@ func (l *Listener) WatchCollection(ctx context.Context, opts *WatchCollectionOpt
 			currentResumeToken := cs.Current.Lookup("_id", "_data").StringValue()
 			operationType := cs.Current.Lookup("operationType").StringValue()
 
-			json, err := bson.MarshalExtJSON(cs.Current, false, false)
-			if err != nil {
-				return errors.ErrFailMarshalStreamData
+			var changeDocument bson.M
+			if err := cs.Decode(&changeDocument); err != nil {
+				return err
 			}
+
+			fullDocument := changeDocument["fullDocument"].(bson.M)
 
 			if _, ok := publishableOperationTypes[operationType]; !ok {
 				if operationType == invalidateOperationType {
@@ -88,7 +90,7 @@ func (l *Listener) WatchCollection(ctx context.Context, opts *WatchCollectionOpt
 				continue
 			}
 
-			if err = opts.ChangeEventHandler(ctx, opts.WatchedSubj, currentResumeToken, OperationType(operationType), json); err != nil {
+			if err = opts.ChangeEventHandler(ctx, opts.WatchedSubj, currentResumeToken, OperationType(operationType), fullDocument); err != nil {
 				slog.Error("could not publish change event", "err", err)
 				break
 			}
@@ -120,8 +122,8 @@ func (l *Listener) Run(ctx context.Context) error {
 				WatchedSubj:            subj,
 				ResumeTokensCollCapped: false,
 				StreamName:             "", // TODO: use as topic prefix
-				ChangeEventHandler: func(ctx context.Context, subj, msgId string, operationType OperationType, data []byte) error {
-					_, err := l.store.AssertData(msgId, subj, operationType, []byte{}, data)
+				ChangeEventHandler: func(ctx context.Context, subj, msgId string, operationType OperationType, data bson.M) error {
+					_, err := l.store.AssertData(msgId, subj, operationType, nil, data)
 					if err != nil {
 						return err
 					}
@@ -132,7 +134,9 @@ func (l *Listener) Run(ctx context.Context) error {
 					}
 					slog.Debug("publish")
 
-					if err := l.eventPubAdapter.Publisher.Publish(groupCtx, "notifier", event); err != nil {
+					topic := l.cfg.GetTopic(subj)
+
+					if err := l.eventPubAdapter.Publisher.Publish(groupCtx, topic, event); err != nil {
 						return err
 					}
 
