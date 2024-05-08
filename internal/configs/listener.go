@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+type DbColl struct {
+	Db   string
+	Coll string
+}
+
 type FilterConfig struct {
 	Db          string              `mapstructure:"db"`
 	Collections map[string][]string `mapstructure:"collections"`
@@ -39,6 +44,15 @@ func NewListenerConfig(c *Configurator) *ListenerConfig {
 
 func (c *ListenerConfig) GetSubject(db, coll string) string {
 	return fmt.Sprintf("%s.%s", db, coll)
+}
+
+func (c *ListenerConfig) GetDbCollBySubject(subj string) *DbColl {
+	parsed := strings.Split(subj, ".")
+
+	return &DbColl{
+		Db:   parsed[0],
+		Coll: parsed[1],
+	}
 }
 
 func (c *ListenerConfig) GetTopic(subj string) string {

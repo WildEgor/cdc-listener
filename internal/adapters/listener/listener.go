@@ -65,7 +65,9 @@ func (l *Listener) WatchCollection(ctx context.Context, opts *WatchCollectionOpt
 			changeStreamOpts.SetResumeAfter(data)
 		}
 
-		cs, err := l.repo.GetWatchStream(changeStreamOpts)
+		meta := l.cfg.GetDbCollBySubject(opts.WatchedSubj)
+
+		cs, err := l.repo.GetWatchStream(meta.Db, meta.Coll, changeStreamOpts)
 		if err != nil {
 			return err
 		}

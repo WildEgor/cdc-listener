@@ -72,7 +72,6 @@ func (mc *MongoConnection) ResumeTokenColl() *mongo.Collection {
 	return mc.client.Database("test").Collection("tokens")
 }
 
-// TODO
-func (mc *MongoConnection) Coll(name string) *mongo.Collection {
-	return mc.client.Database("test").Collection(name)
+func (mc *MongoConnection) DbColl(db, coll string) *mongo.Collection {
+	return mc.client.Database(db).Collection(coll)
 }

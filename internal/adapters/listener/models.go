@@ -55,7 +55,7 @@ type ICDCRepository interface {
 	CreateCollection(ctx context.Context, opts *CreateCollectionOptions) error
 	GetResumeToken(collCapped bool) (string, error)
 	SaveResumeToken(token string) error
-	GetWatchStream(opts *options.ChangeStreamOptions) (*mongo.ChangeStream, error)
+	GetWatchStream(db, coll string, opts *options.ChangeStreamOptions) (*mongo.ChangeStream, error)
 	IsAlive() error
 	Close() error
 }

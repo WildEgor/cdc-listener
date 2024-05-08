@@ -74,8 +74,8 @@ func (r *CDCRepository) GetResumeToken(collCapped bool) (string, error) {
 	return lastResumeToken.Value, nil
 }
 
-func (r *CDCRepository) GetWatchStream(opts *options.ChangeStreamOptions) (*mongo.ChangeStream, error) {
-	cs, err := r.db.Coll("").Watch(context.TODO(), mongo.Pipeline{}, opts)
+func (r *CDCRepository) GetWatchStream(db, coll string, opts *options.ChangeStreamOptions) (*mongo.ChangeStream, error) {
+	cs, err := r.db.DbColl(db, coll).Watch(context.TODO(), mongo.Pipeline{}, opts)
 	if err != nil {
 		return nil, appErrors.ErrFailFindChangeStream
 	}
