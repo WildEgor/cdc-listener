@@ -125,9 +125,9 @@ monitoring:
   promAddr: ":2112"
 ```
 
-3. Run using `air` or `docker`.
+3. Run using `air` or `docker`
 ```shell
-docker-compose up -d build
+docker-compose up -d build listener-dev
 ```
 
 ## Contributing
