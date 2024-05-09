@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    branches: [ main, beta ]
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: write
+      issues: read
+
+    steps:
+      - uses: actions/checkout@v3
+        id: checkout
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-go@v3
+        id: install
+        with:
+          go-version: 1.21
+
+      - uses: go-semantic-release/action@v1
+        with:
+          hooks: goreleaser
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
