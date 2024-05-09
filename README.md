@@ -12,7 +12,7 @@
 ![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/WildEgor/cdc-listener)
 [![Go Report Card](https://goreportcard.com/badge/github.com/WildEgor/cdc-listener)](https://goreportcard.com/report/github.com/WildEgor/cdc-listener)
 ![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/WildEgor/cdc-listener)
-[![Publish Docker image](https://github.com/WildEgor/cdc-listener/actions/workflows/github-actions.yml/badge.svg)](https://github.com/WildEgor/cdc-listener/actions/workflows/github-actions.yml)
+[![Publish Docker image](https://github.com/WildEgor/cdc-listener/actions/workflows/publish.yml/badge.svg)](https://github.com/WildEgor/cdc-listener/actions/workflows/publish.yml)
 
 ## Table of Contents
 - [Introduction](#introduction)
