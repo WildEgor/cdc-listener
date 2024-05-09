@@ -1,0 +1,44 @@
+basePath: /
+host: localhost:8888
+info:
+  contact:
+    email: kartashov_egor96@mail.ru
+    name: mail
+    url: /
+  description: App
+  license:
+    name: MIT
+    url: http://www.apache.org/licenses/MIT.html
+  termsOfService: /
+  title: Swagger Doc
+  version: "1.0"
+paths:
+  /api/v1/livez:
+    get:
+      consumes:
+      - application/json
+      description: Health check service
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Health check service
+      tags:
+      - Health Controller
+  /api/v1/readyz:
+    get:
+      consumes:
+      - application/json
+      description: Ready check service
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Ready check service
+      tags:
+      - Health Controller
+schemes:
+- http
+swagger: "2.0"
