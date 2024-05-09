@@ -22,13 +22,13 @@ FROM base as builder
 WORKDIR /app
 COPY . .
 RUN go install github.com/swaggo/swag/cmd/swag@latest
-RUN $GOPATH/bin/swag init -g cmd/main.go --output docs
+RUN $GOPATH/bin/swag init -g cmd/main.go --output api
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o dist/app cmd/main.go
 
 # Production Stage
 FROM cgr.dev/chainguard/busybox:latest-glibc as production
 WORKDIR /app/
-COPY --from=builder /app/docs/* ./docs
+COPY --from=builder /app/api/* ./api
 COPY --from=builder /app/dist/app .
 RUN mkdir "data"
 CMD ["./app"]

@@ -32,6 +32,8 @@ services:
       RABBITMQ_DEFAULT_USER: "guest"
       RABBITMQ_DEFAULT_PASS: "guest"
       RABBITMQ_DEFAULT_VHOST: "/"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "15672:15672"
       - "5672:5672"
@@ -66,6 +68,23 @@ services:
         condition: on-failure
 
   listener:
+    hostname: listener
+    restart: unless-stopped
+    image: wildegor/cdc-listener:main
+    networks:
+      - listener-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /data:/app/data
+      - ./config.yml:/app/config.yml
+    ports:
+      - 8888:8888
+    depends_on:
+      - mongodb
+      - rabbitmq
+
+  listener-dev:
     hostname: listener
     restart: unless-stopped
     networks:

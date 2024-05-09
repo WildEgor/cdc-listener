@@ -17,4 +17,4 @@ tasks:
 
   # Update swagger files
   swag:
-    cmd: swag init -g cmd/main.go --output docs
+    cmd: swag init -g cmd/main.go --output api
