@@ -20,6 +20,7 @@ func (c *Configurator) load() {
 	viper.AddConfigPath(".")
 	viper.SetConfigName("config")
 	viper.SetConfigType("yml")
+
 	if err := viper.ReadInConfig(); err != nil {
 		slog.Error("error loading config file")
 		return

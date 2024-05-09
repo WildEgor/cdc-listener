@@ -7,11 +7,13 @@ import (
 	"strings"
 )
 
+// DbColl represent database and collection names
 type DbColl struct {
 	Db   string
 	Coll string
 }
 
+// FilterConfig use for filter collections and operations
 type FilterConfig struct {
 	Db          string              `mapstructure:"db"`
 	Collections map[string][]string `mapstructure:"collections"`
@@ -19,8 +21,9 @@ type FilterConfig struct {
 
 // ListenerConfig holds the main app configurations
 type ListenerConfig struct {
-	Filter       []FilterConfig    `mapstructure:"filter"`
-	TopicsMap    map[string]string `mapstructure:"topicsMap"`
+	Filter    []FilterConfig    `mapstructure:"filter"`
+	TopicsMap map[string]string `mapstructure:"topicsMap"`
+
 	MappedFilter map[string][]string
 }
 
@@ -33,6 +36,7 @@ func NewListenerConfig(c *Configurator) *ListenerConfig {
 		slog.Error("app listener parse error")
 	}
 
+	// HINT: make map like 'db.coll' -> operations array
 	for _, s := range cfg.Filter {
 		for coll, ops := range s.Collections {
 			cfg.MappedFilter[cfg.GetSubject(s.Db, coll)] = ops
@@ -42,10 +46,12 @@ func NewListenerConfig(c *Configurator) *ListenerConfig {
 	return &cfg
 }
 
+// GetSubject make subj from db and collection names
 func (c *ListenerConfig) GetSubject(db, coll string) string {
 	return fmt.Sprintf("%s.%s", db, coll)
 }
 
+// GetDbCollBySubject return db and collection names by subject
 func (c *ListenerConfig) GetDbCollBySubject(subj string) *DbColl {
 	parsed := strings.Split(subj, ".")
 
@@ -55,7 +61,8 @@ func (c *ListenerConfig) GetDbCollBySubject(subj string) *DbColl {
 	}
 }
 
-func (c *ListenerConfig) GetTopic(subj string) string {
+// GetTopicBySubject map subject to topic
+func (c *ListenerConfig) GetTopicBySubject(subj string) string {
 	parsed := strings.Split(subj, ".")
 	result := strings.Join(parsed, "-")
 

@@ -10,6 +10,7 @@ var _ publisher.IPublisherConfigFactory = (*PublisherConfig)(nil)
 
 // PublisherConfig holds the main app configurations
 type PublisherConfig struct {
+	// HINT: default topic
 	Topic       string                  `mapstructure:"topic"`
 	TopicPrefix string                  `mapstructure:"topicPrefix"`
 	Addr        string                  `mapstructure:"uri"`

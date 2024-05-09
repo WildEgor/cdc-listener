@@ -35,7 +35,8 @@ func NewServer() (*Server, error) {
 	mongoConnection := mongodb.NewMongoConnection(mongoConfig)
 	cdcRepository := repositories.NewCDCRepository(mongoConnection)
 	listenerConfig := configs.NewListenerConfig(configurator)
-	listenerListener := listener.NewListener(eventPublisherAdapter, cdcRepository, listenerConfig)
+	resumeTokenSaver := listener.NewResumeStore()
+	listenerListener := listener.NewListener(eventPublisherAdapter, cdcRepository, listenerConfig, resumeTokenSaver)
 	server := NewApp(appConfig, errorsHandler, publicRouter, swaggerRouter, listenerListener)
 	return server, nil
 }

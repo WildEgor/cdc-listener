@@ -1,5 +1,11 @@
 package publisher
 
+import (
+	"log/slog"
+	"os"
+)
+
+// EventPublisherAdapter use as wrapper
 type EventPublisherAdapter struct {
 	Publisher IEventPublisher
 }
@@ -11,7 +17,8 @@ func NewEventPublisherAdapter(cfg IPublisherConfigFactory) *EventPublisherAdapte
 	if config.Type == PublisherTypeRabbitMQ {
 		pub, err := NewRabbitPublisher(cfg)
 		if err != nil {
-			return nil
+			slog.Error("publisher init error", slog.Any("err", err))
+			os.Exit(1)
 		}
 
 		adapter.Publisher = pub

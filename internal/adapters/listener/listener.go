@@ -5,7 +5,6 @@ import (
 	"github.com/WildEgor/cdc-listener/internal/adapters/publisher"
 	"github.com/WildEgor/cdc-listener/internal/configs"
 	"github.com/WildEgor/cdc-listener/internal/errors"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/sync/errgroup"
 	"log/slog"
@@ -19,12 +18,13 @@ var _ IListener = (*Listener)(nil)
 type Listener struct {
 	eventPubAdapter *publisher.EventPublisherAdapter
 	repo            ICDCRepository
-	store           *CDCStore
+	store           *CDCData
 	cfg             *configs.ListenerConfig
+	saver           ITokenSaver
 }
 
 // NewListener create new listener
-func NewListener(pub *publisher.EventPublisherAdapter, repo ICDCRepository, cfg *configs.ListenerConfig) *Listener {
+func NewListener(pub *publisher.EventPublisherAdapter, repo ICDCRepository, cfg *configs.ListenerConfig, saver ITokenSaver) *Listener {
 	pool := &sync.Pool{
 		New: func() any {
 			return &publisher.Event{}
@@ -34,7 +34,8 @@ func NewListener(pub *publisher.EventPublisherAdapter, repo ICDCRepository, cfg 
 	return &Listener{
 		eventPubAdapter: pub,
 		repo:            repo,
-		store:           NewCDCStore(pool),
+		saver:           saver,
+		store:           NewCDCData(pool),
 		cfg:             cfg,
 	}
 }
@@ -45,62 +46,72 @@ func (l *Listener) WatchCollection(ctx context.Context, opts *WatchCollectionOpt
 	for resume {
 		time.Sleep(time.Second)
 
-		token, err := l.repo.GetResumeToken(opts.ResumeTokensCollCapped)
-		if err != nil {
-			return err
-		}
+		csOpts := options.ChangeStream().
+			SetFullDocumentBeforeChange(options.WhenAvailable).
+			SetFullDocument(options.UpdateLookup)
 
-		changeStreamOpts := options.ChangeStream().
-			SetFullDocument(options.UpdateLookup).
-			SetFullDocumentBeforeChange(options.WhenAvailable)
+		// FIXME: error occurs
+		// token := l.saver.GetResumeToken(opts.WatchedDb, opts.WatchedColl)
+		//if len(token) != 0 {
+		//	data, err := bson.Marshal(bson.M{"_data": token})
+		//	if err != nil {
+		//		slog.Error("failed to marshal bson resume token: ", err.Error())
+		//		return errors.ErrFailMarshalResumeToken
+		//	}
+		//	csOpts.SetResumeAfter(data)
+		//}
 
-		if len(token) != 0 {
-			m := bson.M{"_data": token}
-			data, err := bson.Marshal(m)
-			if err != nil {
-				slog.Error("failed to marshal bson resume token: ", err.Error())
-				return errors.ErrFailMarshalResumeToken
-			}
-
-			changeStreamOpts.SetResumeAfter(data)
-		}
-
-		meta := l.cfg.GetDbCollBySubject(opts.WatchedSubj)
-
-		cs, err := l.repo.GetWatchStream(meta.Db, meta.Coll, changeStreamOpts)
+		cs, err := l.repo.GetWatchStream(opts, csOpts)
 		if err != nil {
 			return err
 		}
 
 		for cs.Next(ctx) {
-			currentResumeToken := cs.Current.Lookup("_id", "_data").StringValue()
-			operationType := cs.Current.Lookup("operationType").StringValue()
-
-			var changeDocument bson.M
-			if err := cs.Decode(&changeDocument); err != nil {
+			dbEvent := &DbEventData{}
+			if err := cs.Decode(dbEvent); err != nil {
 				return err
 			}
 
-			fullDocument := changeDocument["fullDocument"].(bson.M)
+			if dbEvent.OperationType.IsInvalid() {
+				resume = false
+				slog.Warn("invalid operation type")
+				break
+			}
 
-			if _, ok := publishableOperationTypes[operationType]; !ok {
-				if operationType == invalidateOperationType {
-					resume = false
-					slog.Warn("invalid operation type")
-					break
-				}
+			if !dbEvent.OperationType.IsPublishable() {
 				continue
 			}
 
-			if err = opts.ChangeEventHandler(ctx, opts.WatchedSubj, currentResumeToken, OperationType(operationType), fullDocument); err != nil {
+			rawEvent := &ChangeEventRaw{
+				ID:                        dbEvent.DocumentKey.ID.Hex(),
+				Db:                        opts.WatchedDb,
+				Coll:                      opts.WatchedColl,
+				Kind:                      dbEvent.OperationType,
+				FullDocumentBeforeChanges: dbEvent.FullDocumentBeforeChange,
+				FullDocument:              dbEvent.FullDocument,
+			}
+
+			if err = opts.ChangeEventHandler(ctx, rawEvent); err != nil {
 				slog.Error("could not publish change event", "err", err)
 				break
 			}
 
-			// FIXME
-			//if err = l.repo.SaveResumeToken(currentResumeToken); err != nil {
-			//	slog.Error("could not insert resume token", "err", err)
-			//	break
+			// FIXME: err after restore token above "could not watch mongo collection"
+			//resumeToken := cs.ResumeToken()
+			//if resumeToken != nil {
+			//	var res models.MongoResumeToken
+			//	err := bson.Unmarshal(resumeToken, &res)
+			//	if err != nil {
+			//		slog.Error("error unmarshalling resume token: " + err.Error())
+			//		continue
+			//	}
+			//
+			//	l.saver.SaveResumeToken(&models.ResumeTokenState{
+			//		Db:                     opts.WatchedDb,
+			//		Coll:                   opts.WatchedColl,
+			//		LastMongoResumeToken:   res.Token,
+			//		LastMongoProcessedTime: time.Now(),
+			//	})
 			//}
 		}
 
@@ -118,31 +129,32 @@ func (l *Listener) WatchCollection(ctx context.Context, opts *WatchCollectionOpt
 func (l *Listener) Run(ctx context.Context) error {
 	group, groupCtx := errgroup.WithContext(ctx)
 
+	group.Go(func() error {
+		l.saver.Run()
+		return nil
+	})
+
 	for subj, _ := range l.cfg.MappedFilter {
 		group.Go(func() error {
+			meta := l.cfg.GetDbCollBySubject(subj)
+
 			watchCollOpts := &WatchCollectionOptions{
-				WatchedSubj:            subj,
-				ResumeTokensCollCapped: false,
-				StreamName:             "", // TODO: use as topic prefix
-				ChangeEventHandler: func(ctx context.Context, subj, msgId string, operationType OperationType, data bson.M) error {
-					_, err := l.store.AssertData(msgId, subj, operationType, nil, data)
+				WatchedDb:   meta.Db,
+				WatchedColl: meta.Coll,
+				ChangeEventHandler: func(ctx context.Context, rawEvent *ChangeEventRaw) error {
+					_, err := l.store.Assert(rawEvent)
 					if err != nil {
 						return err
 					}
 
-					event := l.store.CreateEventsWithFilter(groupCtx, l.cfg.MappedFilter)
+					event := l.store.FilterEvent(groupCtx, l.cfg.MappedFilter)
 					if event == nil {
 						return nil
 					}
-					slog.Debug("publish")
 
-					topic := l.cfg.GetTopic(subj)
+					topic := l.cfg.GetTopicBySubject(subj)
 
-					if err := l.eventPubAdapter.Publisher.Publish(groupCtx, topic, event); err != nil {
-						return err
-					}
-
-					return nil
+					return l.eventPubAdapter.Publisher.Publish(groupCtx, topic, event)
 				},
 			}
 
@@ -155,5 +167,8 @@ func (l *Listener) Run(ctx context.Context) error {
 
 // Stop stop listener and disconnect db
 func (l *Listener) Stop() error {
+
+	l.saver.Stop()
+
 	return l.repo.Close()
 }

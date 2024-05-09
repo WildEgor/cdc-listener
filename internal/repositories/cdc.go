@@ -55,27 +55,30 @@ func (r *CDCRepository) CreateCollection(ctx context.Context, opts *listener.Cre
 	return nil
 }
 
-func (r *CDCRepository) GetResumeToken(collCapped bool) (string, error) {
+func (r *CDCRepository) GetResumeToken(db, coll string) string {
 	findOneOpts := options.FindOne()
-	if collCapped {
-		// use natural sort for capped collections to get the last inserted resume token
-		findOneOpts.SetSort(bson.D{{Key: "$natural", Value: -1}})
-	} else {
-		// cannot rely on natural sort for uncapped collections, sort by id instead
-		findOneOpts.SetSort(bson.D{{Key: "_id", Value: -1}})
-	}
+	findOneOpts.SetSort(bson.D{{Key: "_id", Value: -1}})
 
-	lastResumeToken := &models.ResumeToken{}
-	err := r.db.ResumeTokenColl().FindOne(context.TODO(), bson.D{}, findOneOpts).Decode(lastResumeToken)
+	lastResumeToken := &models.ResumeTokenState{}
+	err := r.db.ResumeTokenColl().FindOne(context.TODO(), bson.D{
+		{
+			Key:   "db",
+			Value: db,
+		},
+		{
+			Key:   "coll",
+			Value: coll,
+		},
+	}, findOneOpts).Decode(lastResumeToken)
 	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
-		return "", appErrors.ErrFailFindResumeToken
+		return ""
 	}
 
-	return lastResumeToken.Value, nil
+	return lastResumeToken.LastMongoResumeToken
 }
 
-func (r *CDCRepository) GetWatchStream(db, coll string, opts *options.ChangeStreamOptions) (*mongo.ChangeStream, error) {
-	cs, err := r.db.DbColl(db, coll).Watch(context.TODO(), mongo.Pipeline{}, opts)
+func (r *CDCRepository) GetWatchStream(watch *listener.WatchCollectionOptions, opts *options.ChangeStreamOptions) (*mongo.ChangeStream, error) {
+	cs, err := r.db.DbColl(watch.WatchedDb, watch.WatchedColl).Watch(context.TODO(), mongo.Pipeline{}, opts)
 	if err != nil {
 		return nil, appErrors.ErrFailFindChangeStream
 	}
@@ -83,25 +86,22 @@ func (r *CDCRepository) GetWatchStream(db, coll string, opts *options.ChangeStre
 	return cs, nil
 }
 
-func (r *CDCRepository) SaveResumeToken(token string) error {
-	_, err := r.db.ResumeTokenColl().InsertOne(context.TODO(), &models.ResumeToken{
-		Value: token,
-	})
+func (r *CDCRepository) SaveResumeToken(token *models.ResumeTokenState) error {
+	_, err := r.db.ResumeTokenColl().InsertOne(context.TODO(), token)
 
 	return err
 }
 
-// TODO
 // IsAlive
 func (r *CDCRepository) IsAlive() error {
-	is := r.db.IsAlive()
-	if !is {
-		return errors.New("")
+	if !r.db.IsAlive() {
+		return appErrors.ErrMongoConnection
 	}
 
 	return nil
 }
 
+// Close
 func (r *CDCRepository) Close() error {
 	r.db.Disconnect(context.TODO())
 

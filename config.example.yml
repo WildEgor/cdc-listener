@@ -1,0 +1,31 @@
+app:
+  name: "cdc-listener"
+  port: 8080
+  mode: "develop"
+
+listener:
+  filter:
+    - db: "test"
+      collections:
+        test:
+          - insert
+          - update
+  topicsMap:
+    test-test: "notifier"
+
+logger:
+  level: info
+  format: json
+
+database:
+  uri: mongodb://127.0.0.1:27017,127.0.0.1:27018,127.0.0.1:27019/?replicaSet=rs0
+  debug: false
+
+publisher:
+  type: rabbitmq
+  uri: amqp://guest:guest@127.0.0.1:5672/
+  topic: "notifier"
+  topicPrefix: ""
+
+monitoring:
+  promAddr: ":2112"

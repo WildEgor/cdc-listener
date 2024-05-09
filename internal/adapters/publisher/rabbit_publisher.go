@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/wagslane/go-rabbitmq"
+	"log/slog"
 )
 
 var _ IEventPublisher = (*RabbitPublisher)(nil)
@@ -16,11 +17,12 @@ type RabbitPublisher struct {
 	publisher *rabbitmq.Publisher `wire:"-"`
 }
 
+// TODO: what if connection not established?
 // NewRabbitPublisher create new RabbitPublisher instance.
 func NewRabbitPublisher(cfg IPublisherConfigFactory) (*RabbitPublisher, error) {
 	conn, err := rabbitmq.NewConn(cfg.Config().Addr)
 	if err != nil {
-		return nil, fmt.Errorf("new conn: %w", err)
+		return nil, fmt.Errorf("no rabbit conn: %w", err)
 	}
 
 	publisher, err := rabbitmq.NewPublisher(
@@ -43,21 +45,30 @@ func NewRabbitPublisher(cfg IPublisherConfigFactory) (*RabbitPublisher, error) {
 	}, nil
 }
 
-// Publish send events, implements eventPublisher.
+// Publish send events, implements IEventPublisher
 func (p *RabbitPublisher) Publish(ctx context.Context, topic string, event *Event) error {
 	body, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
 
+	exchange := topic
+	if len(topic) == 0 {
+		exchange = p.pt
+	}
+
+	slog.Debug("publish event",
+		slog.Any("topic", exchange),
+		slog.Any("event", event),
+	)
+
 	return p.publisher.PublishWithContext(
 		ctx,
 		body,
 		[]string{""},
 		//rabbitmq.WithPublishOptionsContentEncoding("utf-8"),
-		rabbitmq.WithPublishOptionsExchange(topic),
+		rabbitmq.WithPublishOptionsExchange(exchange),
 		rabbitmq.WithPublishOptionsContentType("application/json"),
-		rabbitmq.WithPublishOptionsExchange(p.pt),
 	)
 }
 

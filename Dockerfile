@@ -32,4 +32,5 @@ COPY --from=builder /app/docs/* ./docs
 COPY --from=builder /app/dist/app .
 # Specify method fetch .env!
 COPY --from=builder /app/.env.local .
+RUN mkdir "data"
 CMD ["./app"]

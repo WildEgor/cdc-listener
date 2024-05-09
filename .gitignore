@@ -7,6 +7,7 @@
 
 .idea
 
+/data
 tmp
 app
 
@@ -20,3 +21,4 @@ app
 # vendor/
 
 config.yml
+
