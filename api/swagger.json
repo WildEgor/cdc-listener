@@ -41,9 +41,9 @@
                 }
             }
         },
-        "/api/v1/ping": {
+        "/api/v1/metrics": {
             "get": {
-                "description": "Just random return 200 OK or error",
+                "description": "Metrics service",
                 "consumes": [
                     "application/json"
                 ],
@@ -51,9 +51,9 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Test Controller"
+                    "Metrics Controller"
                 ],
-                "summary": "Dummy ping",
+                "summary": "Metrics service",
                 "responses": {
                     "200": {
                         "description": "OK"

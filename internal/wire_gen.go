@@ -8,11 +8,13 @@ package pkg
 
 import (
 	"github.com/WildEgor/cdc-listener/internal/adapters/listener"
+	"github.com/WildEgor/cdc-listener/internal/adapters/monitor"
 	"github.com/WildEgor/cdc-listener/internal/adapters/publisher"
 	"github.com/WildEgor/cdc-listener/internal/configs"
 	"github.com/WildEgor/cdc-listener/internal/db/mongodb"
 	"github.com/WildEgor/cdc-listener/internal/handlers/errors"
 	"github.com/WildEgor/cdc-listener/internal/handlers/health_check"
+	"github.com/WildEgor/cdc-listener/internal/handlers/metrics"
 	"github.com/WildEgor/cdc-listener/internal/handlers/ready_check"
 	"github.com/WildEgor/cdc-listener/internal/repositories"
 	"github.com/WildEgor/cdc-listener/internal/routers"
@@ -27,16 +29,20 @@ func NewServer() (*Server, error) {
 	errorsHandler := error_handler.NewErrorsHandler()
 	healthCheckHandler := health_check_handler.NewHealthCheckHandler()
 	readyCheckHandler := ready_check_handler.NewReadyCheckHandler()
-	publicRouter := routers.NewPublicRouter(healthCheckHandler, readyCheckHandler)
+	promMetricsRegistry := monitor.NewPromMetricsRegistry()
+	metricsHandler := metrics_handler.NewMetricsHandler(promMetricsRegistry)
+	publicRouter := routers.NewPublicRouter(healthCheckHandler, readyCheckHandler, metricsHandler)
 	swaggerRouter := routers.NewSwaggerRouter()
 	publisherConfig := configs.NewPublisherConfig(configurator)
 	eventPublisherAdapter := publisher.NewEventPublisherAdapter(publisherConfig)
+	metricsConfig := configs.NewMetricsConfig(configurator)
+	promMetrics := monitor.NewPromMetrics(promMetricsRegistry, appConfig, metricsConfig)
 	mongoConfig := configs.NewMongoConfig(configurator)
 	mongoConnection := mongodb.NewMongoConnection(mongoConfig)
 	cdcRepository := repositories.NewCDCRepository(mongoConnection)
 	listenerConfig := configs.NewListenerConfig(configurator)
 	resumeTokenSaver := listener.NewResumeStore()
-	listenerListener := listener.NewListener(eventPublisherAdapter, cdcRepository, listenerConfig, resumeTokenSaver)
+	listenerListener := listener.NewListener(eventPublisherAdapter, promMetrics, cdcRepository, listenerConfig, resumeTokenSaver)
 	server := NewApp(appConfig, errorsHandler, publicRouter, swaggerRouter, listenerListener)
 	return server, nil
 }

@@ -26,19 +26,19 @@ paths:
       summary: Health check service
       tags:
       - Health Controller
-  /api/v1/ping:
+  /api/v1/metrics:
     get:
       consumes:
       - application/json
-      description: Just random return 200 OK or error
+      description: Metrics service
       produces:
       - application/json
       responses:
         "200":
           description: OK
-      summary: Dummy ping
+      summary: Metrics service
       tags:
-      - Test Controller
+      - Metrics Controller
   /api/v1/readyz:
     get:
       consumes:

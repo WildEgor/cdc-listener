@@ -12,5 +12,7 @@ var ConfigsSet = wire.NewSet(
 	NewMongoConfig,
 	NewListenerConfig,
 	NewPublisherConfig,
+	NewLoggerConfig,
+	NewMetricsConfig,
 	wire.Bind(new(publisher.IPublisherConfigFactory), new(*PublisherConfig)),
 )

@@ -66,6 +66,7 @@ func (s *CDCData) Assert(rawEvent *ChangeEventRaw) (a *ChangedData, err error) {
 // FilterEvent filter db events
 func (s *CDCData) FilterEvent(ctx context.Context, tableMap map[string][]string) *publisher.Event {
 	if s.data == nil {
+		slog.Warn("call Assert before filter first")
 		return nil
 	}
 
