@@ -5,6 +5,8 @@ import (
 	"github.com/WildEgor/cdc-listener/internal/adapters/publisher"
 	"github.com/WildEgor/cdc-listener/internal/configs"
 	"github.com/WildEgor/cdc-listener/internal/errors"
+	"github.com/WildEgor/cdc-listener/internal/models"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/sync/errgroup"
 	"log/slog"
@@ -50,16 +52,10 @@ func (l *Listener) WatchCollection(ctx context.Context, opts *WatchCollectionOpt
 			SetFullDocumentBeforeChange(options.WhenAvailable).
 			SetFullDocument(options.UpdateLookup)
 
-		// FIXME: error occurs
-		// token := l.saver.GetResumeToken(opts.WatchedDb, opts.WatchedColl)
-		//if len(token) != 0 {
-		//	data, err := bson.Marshal(bson.M{"_data": token})
-		//	if err != nil {
-		//		slog.Error("failed to marshal bson resume token: ", err.Error())
-		//		return errors.ErrFailMarshalResumeToken
-		//	}
-		//	csOpts.SetResumeAfter(data)
-		//}
+		token := l.saver.GetResumeToken(opts.WatchedDb, opts.WatchedColl)
+		if len(token) != 0 {
+			csOpts.SetResumeAfter(bson.M{"_data": token})
+		}
 
 		cs, err := l.repo.GetWatchStream(opts, csOpts)
 		if err != nil {
@@ -96,23 +92,22 @@ func (l *Listener) WatchCollection(ctx context.Context, opts *WatchCollectionOpt
 				break
 			}
 
-			// FIXME: err after restore token above "could not watch mongo collection"
-			//resumeToken := cs.ResumeToken()
-			//if resumeToken != nil {
-			//	var res models.MongoResumeToken
-			//	err := bson.Unmarshal(resumeToken, &res)
-			//	if err != nil {
-			//		slog.Error("error unmarshalling resume token: " + err.Error())
-			//		continue
-			//	}
-			//
-			//	l.saver.SaveResumeToken(&models.ResumeTokenState{
-			//		Db:                     opts.WatchedDb,
-			//		Coll:                   opts.WatchedColl,
-			//		LastMongoResumeToken:   res.Token,
-			//		LastMongoProcessedTime: time.Now(),
-			//	})
-			//}
+			resumeToken := cs.ResumeToken()
+			if resumeToken != nil {
+				var res models.MongoResumeToken
+				err := bson.Unmarshal(resumeToken, &res)
+				if err != nil {
+					slog.Error("error unmarshalling resume token: " + err.Error())
+					continue
+				}
+
+				l.saver.SaveResumeToken(&models.ResumeTokenState{
+					Db:                     opts.WatchedDb,
+					Coll:                   opts.WatchedColl,
+					LastMongoResumeToken:   res.Token,
+					LastMongoProcessedTime: time.Now(),
+				})
+			}
 		}
 
 		slog.Info("stopped watching mongodb collection")
