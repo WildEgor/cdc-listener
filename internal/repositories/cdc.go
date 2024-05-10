@@ -80,6 +80,7 @@ func (r *CDCRepository) GetResumeToken(db, coll string) string {
 func (r *CDCRepository) GetWatchStream(watch *listener.WatchCollectionOptions, opts *options.ChangeStreamOptions) (*mongo.ChangeStream, error) {
 	cs, err := r.db.DbColl(watch.WatchedDb, watch.WatchedColl).Watch(context.TODO(), mongo.Pipeline{}, opts)
 	if err != nil {
+		slog.Error("fail get watch stream", slog.Any("err", err))
 		return nil, appErrors.ErrFailFindChangeStream
 	}
 
