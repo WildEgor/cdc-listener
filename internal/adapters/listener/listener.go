@@ -2,6 +2,7 @@ package listener
 
 import (
 	"context"
+	"github.com/WildEgor/cdc-listener/internal/adapters/monitor"
 	"github.com/WildEgor/cdc-listener/internal/adapters/publisher"
 	"github.com/WildEgor/cdc-listener/internal/configs"
 	"github.com/WildEgor/cdc-listener/internal/errors"
@@ -19,6 +20,7 @@ var _ IListener = (*Listener)(nil)
 // Listener wrapper for collections listen logic
 type Listener struct {
 	eventPubAdapter *publisher.EventPublisherAdapter
+	metrics         monitor.IMonitor
 	repo            ICDCRepository
 	store           *CDCData
 	cfg             *configs.ListenerConfig
@@ -26,7 +28,7 @@ type Listener struct {
 }
 
 // NewListener create new listener
-func NewListener(pub *publisher.EventPublisherAdapter, repo ICDCRepository, cfg *configs.ListenerConfig, saver ITokenSaver) *Listener {
+func NewListener(pub *publisher.EventPublisherAdapter, metrics monitor.IMonitor, repo ICDCRepository, cfg *configs.ListenerConfig, saver ITokenSaver) *Listener {
 	pool := &sync.Pool{
 		New: func() any {
 			return &publisher.Event{}
@@ -35,6 +37,7 @@ func NewListener(pub *publisher.EventPublisherAdapter, repo ICDCRepository, cfg 
 
 	return &Listener{
 		eventPubAdapter: pub,
+		metrics:         metrics,
 		repo:            repo,
 		saver:           saver,
 		store:           NewCDCData(pool),
@@ -59,12 +62,14 @@ func (l *Listener) WatchCollection(ctx context.Context, opts *WatchCollectionOpt
 
 		cs, err := l.repo.GetWatchStream(opts, csOpts)
 		if err != nil {
+			l.metrics.IncProblematicEventsCounter(monitor.ProblemWatch)
 			return err
 		}
 
 		for cs.Next(ctx) {
 			dbEvent := &DbEventData{}
 			if err := cs.Decode(dbEvent); err != nil {
+				l.metrics.IncProblematicEventsCounter(monitor.ProblemKindDecode)
 				return err
 			}
 
@@ -139,17 +144,27 @@ func (l *Listener) Run(ctx context.Context) error {
 				ChangeEventHandler: func(ctx context.Context, rawEvent *ChangeEventRaw) error {
 					_, err := l.store.Assert(rawEvent)
 					if err != nil {
-						return err
+						l.metrics.IncProblematicEventsCounter(monitor.ProblemKindParse)
+						return nil
 					}
 
 					event := l.store.FilterEvent(groupCtx, l.cfg.MappedFilter)
 					if event == nil {
+						l.metrics.IncFilteredEventsCounter(rawEvent.Db, rawEvent.Coll)
 						return nil
 					}
 
 					topic := l.cfg.GetTopicBySubject(subj)
 
-					return l.eventPubAdapter.Publisher.Publish(groupCtx, topic, event)
+					err = l.eventPubAdapter.Publisher.Publish(groupCtx, topic, event)
+					if err != nil {
+						l.metrics.IncProblematicEventsCounter(monitor.ProblemKindPublish)
+						return nil
+					}
+
+					l.metrics.IncPublishedEventsCounter(event.Db, event.Collection)
+
+					return nil
 				},
 			}
 

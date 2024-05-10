@@ -66,6 +66,7 @@ func (s *CDCData) Assert(rawEvent *ChangeEventRaw) (a *ChangedData, err error) {
 // FilterEvent filter db events
 func (s *CDCData) FilterEvent(ctx context.Context, tableMap map[string][]string) *publisher.Event {
 	if s.data == nil {
+		slog.Warn("call Assert before filter first")
 		return nil
 	}
 
@@ -115,6 +116,8 @@ func (s *CDCData) convertBsonToJson(doc bson.D) map[string]any {
 				subMap[subKey] = subVal
 			}
 			convertedItem[val.Key] = subMap
+		case bson.D:
+			convertedItem[val.Key] = s.convertBsonToJson(v)
 		case bson.A:
 			subArray := make([]interface{}, len(v))
 			for i, subVal := range v {
@@ -122,7 +125,7 @@ func (s *CDCData) convertBsonToJson(doc bson.D) map[string]any {
 			}
 			convertedItem[val.Key] = subArray
 		default:
-			convertedItem[val.Key] = v
+			convertedItem[val.Key] = val.Value
 		}
 	}
 

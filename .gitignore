@@ -21,4 +21,5 @@ app
 # vendor/
 
 config.yml
+config.docker.yml
 

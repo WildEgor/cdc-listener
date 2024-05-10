@@ -5,7 +5,7 @@ import (
 	"log/slog"
 )
 
-// AppConfig holds the main app configurations
+// MetricsConfig holds the main app configurations
 type AppConfig struct {
 	Name string `mapstructure:"name"`
 	Port string `mapstructure:"port"`

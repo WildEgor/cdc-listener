@@ -3,11 +3,11 @@ package mongodb
 import (
 	"context"
 	"github.com/WildEgor/cdc-listener/internal/configs"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"log/slog"
-
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"log/slog"
+	"time"
 )
 
 type MongoConnection struct {
@@ -26,13 +26,13 @@ func NewMongoConnection(cfg *configs.MongoConfig) *MongoConnection {
 }
 
 func (mc *MongoConnection) Connect(ctx context.Context) {
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mc.cfg.URI))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mc.cfg.URI), options.Client().SetConnectTimeout(5*time.Second))
 	if err != nil {
 		slog.Error("fail connect to mongo", err)
 		panic(err)
 	}
 
-	err = client.Ping(ctx, nil)
+	err = client.Ping(context.TODO(), readpref.Primary())
 	if err != nil {
 		slog.Error("fail connect to mongo", err)
 		panic(err)
