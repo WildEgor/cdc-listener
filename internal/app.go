@@ -35,22 +35,22 @@ type Server struct {
 func (srv *Server) Run(ctx context.Context) {
 	slog.Info("server is listening")
 
-	go func(ctx context.Context) {
-		err := srv.Listener.Run(ctx)
-		if err != nil {
-			slog.Error("unable to start listener")
+	go func() {
+		if err := srv.App.Listen(fmt.Sprintf(":%s", srv.AppConfig.Port), fiber.ListenConfig{
+			DisableStartupMessage: false,
+			EnablePrintRoutes:     false,
+			OnShutdownSuccess: func() {
+				slog.Debug("success shutdown service")
+			},
+		}); err != nil {
+			slog.Error("unable to start server")
 			return
 		}
-	}(ctx)
+	}()
 
-	if err := srv.App.Listen(fmt.Sprintf(":%s", srv.AppConfig.Port), fiber.ListenConfig{
-		DisableStartupMessage: false,
-		EnablePrintRoutes:     false,
-		OnShutdownSuccess: func() {
-			slog.Debug("success shutdown service")
-		},
-	}); err != nil {
-		slog.Error("unable to start server")
+	err := srv.Listener.Run(ctx)
+	if err != nil {
+		slog.Error("unable to start listener")
 		return
 	}
 }
