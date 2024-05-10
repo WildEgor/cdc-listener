@@ -2,6 +2,7 @@ package routers
 
 import (
 	health_check_handler "github.com/WildEgor/cdc-listener/internal/handlers/health_check"
+	metrics_handler "github.com/WildEgor/cdc-listener/internal/handlers/metrics"
 	ready_check_handler "github.com/WildEgor/cdc-listener/internal/handlers/ready_check"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/healthcheck"
@@ -12,15 +13,18 @@ import (
 type PublicRouter struct {
 	hch *health_check_handler.HealthCheckHandler
 	rch *ready_check_handler.ReadyCheckHandler
+	mh  *metrics_handler.MetricsHandler
 }
 
 func NewPublicRouter(
 	hch *health_check_handler.HealthCheckHandler,
 	rch *ready_check_handler.ReadyCheckHandler,
+	mh *metrics_handler.MetricsHandler,
 ) *PublicRouter {
 	return &PublicRouter{
 		hch,
 		rch,
+		mh,
 	}
 }
 
@@ -55,4 +59,6 @@ func (r *PublicRouter) Setup(app *fiber.App) {
 			return true
 		},
 	}))
+
+	v1.Get("/metrics", r.mh.Handle)
 }

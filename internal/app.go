@@ -3,7 +3,6 @@ package pkg
 import (
 	"context"
 	"fmt"
-	"github.com/WildEgor/cdc-listener/internal/adapters"
 	"github.com/WildEgor/cdc-listener/internal/adapters/listener"
 	"github.com/WildEgor/cdc-listener/internal/configs"
 	eh "github.com/WildEgor/cdc-listener/internal/handlers/errors"
@@ -16,14 +15,12 @@ import (
 	"github.com/gofiber/template/html/v2"
 	"github.com/google/wire"
 	"log/slog"
-	"os"
 	"time"
 )
 
 var AppSet = wire.NewSet(
 	configs.ConfigsSet,
 	routers.RouterSet,
-	adapters.AdaptersSet,
 	repositories.RepositoriesSet,
 	NewApp,
 )
@@ -38,11 +35,13 @@ type Server struct {
 func (srv *Server) Run(ctx context.Context) {
 	slog.Info("server is listening")
 
-	err := srv.Listener.Run(ctx)
-	if err != nil {
-		slog.Error("unable to start listener")
-		return
-	}
+	go func(ctx context.Context) {
+		err := srv.Listener.Run(ctx)
+		if err != nil {
+			slog.Error("unable to start listener")
+			return
+		}
+	}(ctx)
 
 	if err := srv.App.Listen(fmt.Sprintf(":%s", srv.AppConfig.Port), fiber.ListenConfig{
 		DisableStartupMessage: false,
@@ -75,16 +74,6 @@ func NewApp(
 	sr *routers.SwaggerRouter,
 	l listener.IListener,
 ) *Server {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
-	if ac.IsProduction() {
-		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelInfo,
-		}))
-	}
-	slog.SetDefault(logger)
-
 	app := fiber.New(fiber.Config{
 		AppName:      ac.Name,
 		ErrorHandler: eh.Handle,
