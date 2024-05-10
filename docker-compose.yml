@@ -74,9 +74,9 @@ services:
       - listener-net
     volumes:
       - /data:/app/data
-      - ./config.yml:/app/config.yml
+      - ./config.docker.yml:/app/config.yml
     ports:
-      - 8888:8888
+      - "8888:8888"
     depends_on:
       - mongodb
       - rabbitmq
@@ -92,9 +92,8 @@ services:
       target: dev
     volumes:
       - ./:/app
-      - /data:/app/data
     ports:
-      - 8888:8888
+      - "8888:8888"
     depends_on:
       - mongodb
       - rabbitmq

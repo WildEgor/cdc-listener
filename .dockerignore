@@ -4,3 +4,5 @@ docker-compose.yml
 .air.toml
 .air-unix.toml
 config.yml
+config.example.yml
+config.docker.yml

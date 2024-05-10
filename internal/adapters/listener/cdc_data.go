@@ -115,6 +115,8 @@ func (s *CDCData) convertBsonToJson(doc bson.D) map[string]any {
 				subMap[subKey] = subVal
 			}
 			convertedItem[val.Key] = subMap
+		case bson.D:
+			convertedItem[val.Key] = s.convertBsonToJson(v)
 		case bson.A:
 			subArray := make([]interface{}, len(v))
 			for i, subVal := range v {
@@ -122,7 +124,7 @@ func (s *CDCData) convertBsonToJson(doc bson.D) map[string]any {
 			}
 			convertedItem[val.Key] = subArray
 		default:
-			convertedItem[val.Key] = v
+			convertedItem[val.Key] = val.Value
 		}
 	}
 
